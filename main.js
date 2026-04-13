@@ -1,0 +1,147 @@
+const { app, BrowserWindow, shell, Menu, session } = require("electron");
+const path = require("path");
+
+const RHWP_URL = "https://edwardkim.github.io/rhwp/";
+const RHWP_ORIGIN = "https://edwardkim.github.io";
+
+// --dev-show-topbar: electron . --dev-show-topbar 또는 앱.exe --dev-show-topbar
+const showTopbar = process.argv.includes("--dev-show-topbar");
+
+// 데스크톱 앱으로서 허용해야 할 권한 목록
+const GRANTED_PERMISSIONS = new Set([
+  "clipboard-read",              // 클립보드 붙여넣기
+  "clipboard-sanitized-write",   // 클립보드 복사
+  "fileSystem",                  // 파일 열기/저장 (File System Access API)
+  "fullscreen",                  // 전체 화면
+  "notifications",               // 알림
+  "pointerLock",                 // UI 드래그 조작
+  "window-management",           // 다중 모니터 창 배치
+  "storage-access",              // 로컬 스토리지
+  "top-level-storage-access",    // 로컬 스토리지 (최상위)
+  "idle-detection",              // 유휴 감지
+]);
+
+function setupPermissions() {
+  const ses = session.defaultSession;
+
+  // 권한 요청 — 허용 목록이면 즉시 승인
+  ses.setPermissionRequestHandler((webContents, permission, callback) => {
+    callback(GRANTED_PERMISSIONS.has(permission));
+  });
+
+  // 권한 체크 — 허용 목록이면 true 반환
+  ses.setPermissionCheckHandler((webContents, permission) => {
+    return GRANTED_PERMISSIONS.has(permission);
+  });
+}
+
+function createWindow() {
+  const winOptions = {
+    width: 1280,
+    height: 900,
+    title: "RHWP",
+    icon: path.join(__dirname, "assets", "icon.png"),
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      spellcheck: true,
+    },
+  };
+
+  // 타이틀바 통합: Windows 타이틀바 숨기고 메뉴바 우측에 창 컨트롤 오버레이
+  if (!showTopbar) {
+    winOptions.titleBarStyle = "hidden";
+    winOptions.titleBarOverlay = {
+      color: "#f5f5f5",       // 메뉴바 배경색 (--color-bg-light)
+      symbolColor: "#333333", // 메뉴바 텍스트색 (--color-text)
+      height: 27,             // 메뉴바 높이(28px) - border(1px)
+    };
+  }
+
+  const win = new BrowserWindow(winOptions);
+
+  if (showTopbar) {
+    const menu = Menu.buildFromTemplate([
+      {
+        label: "파일",
+        submenu: [{ role: "quit", label: "종료" }],
+      },
+      {
+        label: "보기",
+        submenu: [
+          { role: "reload", label: "새로고침" },
+          { role: "forceReload", label: "강제 새로고침" },
+          { role: "togglefullscreen", label: "전체 화면" },
+        ],
+      },
+      {
+        label: "개발",
+        submenu: [
+          { role: "toggleDevTools", label: "개발자 도구" },
+        ],
+      },
+    ]);
+    Menu.setApplicationMenu(menu);
+  } else {
+    Menu.setApplicationMenu(null);
+  }
+
+  // 같은 출처 팝업은 앱 내 새 창으로, 외부 링크는 기본 브라우저로
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith(RHWP_URL) || url.startsWith("about:blank")) {
+      return { action: "allow" };
+    }
+    shell.openExternal(url);
+    return { action: "deny" };
+  });
+
+  // 창 제목: "rhwp-studio" → "RHWP", 파일 열면 "파일명 - RHWP"
+  win.on("page-title-updated", (event, title) => {
+    event.preventDefault();
+    win.setTitle(title.replace("rhwp-studio", "RHWP"));
+  });
+
+  // 파일 다운로드(내보내기/저장) — 저장 대화상자 표시
+  session.defaultSession.on("will-download", (event, item) => {
+    // Electron 기본 동작: 저장 대화상자 표시 후 다운로드
+  });
+
+  // 파일 시스템 접근 제한 해제
+  win.webContents.on("file-system-access-restricted", (event, details, callback) => {
+    callback("allow");
+  });
+
+  // 페이지 로드 후 메뉴바에 창 컨트롤 공간 확보 + 드래그 영역 설정
+  if (!showTopbar) {
+    win.webContents.on("did-finish-load", () => {
+      win.webContents.insertCSS(`
+        /* 창 컨트롤 오버레이(최소화/최대화/닫기)와 겹치지 않도록 여백 확보 */
+        #menu-bar {
+          padding-right: 140px !important;
+          -webkit-app-region: drag;
+        }
+        /* 메뉴 항목은 클릭 가능해야 하므로 드래그 제외 */
+        #menu-bar .menu-item {
+          -webkit-app-region: no-drag;
+        }
+      `);
+    });
+  }
+
+  win.loadURL(RHWP_URL);
+}
+
+app.whenReady().then(() => {
+  setupPermissions();
+  createWindow();
+});
+
+app.on("window-all-closed", () => {
+  app.quit();
+});
+
+app.on("activate", () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
+});

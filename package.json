@@ -1,0 +1,37 @@
+{
+  "name": "rhwp-online-app",
+  "version": "1.0.0",
+  "description": "RHWP - Desktop App",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win",
+    "build:portable": "electron-builder --win portable"
+  },
+  "author": "Mugen-Houyou",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^41.2.0",
+    "electron-builder": "^26.8.1"
+  },
+  "build": {
+    "appId": "com.rhwp.online-app",
+    "productName": "RHWP",
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerLanguages": ["ko-KR", "en-US"]
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "Mugen-Houyou",
+      "repo": "rhwp-online-app"
+    }
+  }
+}
