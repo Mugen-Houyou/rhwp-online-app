@@ -30,6 +30,10 @@ npm run build:portable  # portable 단독
 
 단일 파일 Electron 앱입니다. 엔트리는 [main.js](main.js)이며, 앱 설정과 빌드 구성은 [package.json](package.json)에 있습니다.
 
+## 크레딧
+
+- 래핑 대상 웹앱 및 로고: [edwardkim/rhwp](https://github.com/edwardkim/rhwp) (MIT License, © 2025-2026 Edward Kim)
+
 ## 라이센스
 
 원본 [RHWP 웹앱](https://github.com/edwardkim/rhwp)와 동일하게 MIT License로 배포됩니다. 자세한 내용은 [LICENSE](LICENSE)를 참고하세요.

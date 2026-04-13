@@ -41,7 +41,7 @@ function createWindow() {
     width: 1280,
     height: 900,
     title: "RHWP",
-    icon: path.join(__dirname, "assets", "icon.png"),
+    icon: path.join(__dirname, "build", "icon.png"),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
