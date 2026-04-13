@@ -95,6 +95,14 @@ function createWindow() {
     return { action: "deny" };
   });
 
+  // 앱 내 네비게이션도 RHWP 출처로만 제한 — 외부 URL은 기본 브라우저로
+  win.webContents.on("will-navigate", (event, url) => {
+    if (!url.startsWith(RHWP_ORIGIN)) {
+      event.preventDefault();
+      shell.openExternal(url);
+    }
+  });
+
   // 창 제목: "rhwp-studio" → "RHWP", 파일 열면 "파일명 - RHWP"
   win.on("page-title-updated", (event, title) => {
     event.preventDefault();
