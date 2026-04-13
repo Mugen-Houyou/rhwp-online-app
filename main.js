@@ -1,4 +1,5 @@
 const { app, BrowserWindow, shell, Menu, session } = require("electron");
+const { autoUpdater } = require("electron-updater");
 const path = require("path");
 
 const RHWP_URL = "https://edwardkim.github.io/rhwp/";
@@ -120,8 +121,8 @@ function createWindow() {
   });
 
   // 페이지 로드 후 메뉴바에 창 컨트롤 공간 확보 + 드래그 영역 설정
-  if (!showTopbar) {
-    win.webContents.on("did-finish-load", () => {
+  win.webContents.on("did-finish-load", () => {
+    if (!showTopbar) {
       win.webContents.insertCSS(`
         /* 창 컨트롤 오버레이(최소화/최대화/닫기)와 겹치지 않도록 여백 확보 */
         #menu-bar {
@@ -133,8 +134,34 @@ function createWindow() {
           -webkit-app-region: no-drag;
         }
       `);
-    });
-  }
+    }
+
+    // 상태바(#sb-message)를 감시해 파일명을 document.title로 반영
+    // — rhwp-studio가 자체적으로 document.title을 갱신하지 않기 때문
+    win.webContents.executeJavaScript(`
+      (() => {
+        const sb = document.getElementById("sb-message");
+        if (!sb) return;
+        const DEFAULT = "HWP 파일을 선택해주세요.";
+        const SEPARATOR = " \u2014 "; // " — "
+        const update = () => {
+          const text = (sb.textContent || "").trim();
+          if (!text || text === DEFAULT) {
+            document.title = "rhwp-studio";
+            return;
+          }
+          const filename = text.split(SEPARATOR)[0].trim();
+          document.title = filename ? filename + " - rhwp-studio" : "rhwp-studio";
+        };
+        update();
+        new MutationObserver(update).observe(sb, {
+          childList: true,
+          characterData: true,
+          subtree: true,
+        });
+      })();
+    `);
+  });
 
   win.loadURL(RHWP_URL);
 }
@@ -142,6 +169,7 @@ function createWindow() {
 app.whenReady().then(() => {
   setupPermissions();
   createWindow();
+  autoUpdater.checkForUpdatesAndNotify().catch(() => {});
 });
 
 app.on("window-all-closed", () => {

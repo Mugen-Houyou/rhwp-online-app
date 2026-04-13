@@ -1,6 +1,6 @@
 {
   "name": "rhwp-online-app",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "RHWP - Desktop App",
   "main": "main.js",
   "scripts": {
@@ -36,5 +36,8 @@
       "owner": "Mugen-Houyou",
       "repo": "rhwp-online-app"
     }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.3"
   }
 }
