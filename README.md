@@ -1,6 +1,6 @@
-# RHWP
+# RHWP Online
 
-[RHWP 프로젝트](https://github.com/edwardkim/rhwp)의 [웹앱](https://edwardkim.github.io/rhwp/)을 감싸는 Windows 데스크톱 셸입니다.
+[edwardkim/rhwp](https://github.com/edwardkim/rhwp)님의 [RHWP 프로젝트](https://github.com/edwardkim/rhwp)의 [웹앱](https://edwardkim.github.io/rhwp/)을 감싸는 Windows 데스크톱 셸입니다.
 
 ## 기능
 
