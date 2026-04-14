@@ -128,37 +128,97 @@ function createWindow() {
         #menu-bar {
           padding-right: 140px !important;
           -webkit-app-region: drag;
+          position: relative !important;
         }
         /* 메뉴 항목은 클릭 가능해야 하므로 드래그 제외 */
         #menu-bar .menu-item {
           -webkit-app-region: no-drag;
         }
+        /* VS Code 스타일 중앙 타이틀 표시 — left/right는 JS가
+           메뉴 항목 실측 폭에 따라 동적으로 설정 */
+        #rhwp-title-bar {
+          position: absolute;
+          top: 0;
+          height: 27px;
+          line-height: 27px;
+          font-size: 12px;
+          color: #555;
+          text-align: center;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          pointer-events: none;
+          -webkit-app-region: drag;
+        }
       `);
     }
 
-    // 상태바(#sb-message)를 감시해 파일명을 document.title로 반영
+    // 상태바(#sb-message)를 감시해 파일명을 document.title과 메뉴바 중앙에 반영
     // — rhwp-studio가 자체적으로 document.title을 갱신하지 않기 때문
+    const injectTitleBar = !showTopbar;
     win.webContents.executeJavaScript(`
       (() => {
         const sb = document.getElementById("sb-message");
         if (!sb) return;
         const DEFAULT = "HWP 파일을 선택해주세요.";
         const SEPARATOR = " \u2014 "; // " — "
+
+        let titleEl = null;
+        let menuBar = null;
+        if (${injectTitleBar}) {
+          menuBar = document.getElementById("menu-bar");
+          if (menuBar) {
+            titleEl = document.createElement("div");
+            titleEl.id = "rhwp-title-bar";
+            menuBar.appendChild(titleEl);
+          }
+        }
+
+        // 메뉴 항목의 실제 우측 끝을 측정해 타이틀 바를 그 다음에 배치
+        // 가용 폭이 부족하면 숨김
+        const RESERVED_RIGHT = 160; // 창 컨트롤(140) + 여백(20)
+        const MIN_GAP = 20;
+        const MIN_WIDTH = 80;
+        const reposition = () => {
+          if (!titleEl || !menuBar) return;
+          const menuBarRect = menuBar.getBoundingClientRect();
+          const items = menuBar.querySelectorAll(".menu-item");
+          let menuRight = menuBarRect.left;
+          items.forEach((item) => {
+            if (item === titleEl || titleEl.contains(item)) return;
+            const r = item.getBoundingClientRect();
+            if (r.right > menuRight) menuRight = r.right;
+          });
+          const leftPx = menuRight - menuBarRect.left + MIN_GAP;
+          const availableWidth = menuBarRect.width - leftPx - RESERVED_RIGHT;
+          if (availableWidth < MIN_WIDTH) {
+            titleEl.style.display = "none";
+          } else {
+            titleEl.style.display = "";
+            titleEl.style.left = leftPx + "px";
+            titleEl.style.right = RESERVED_RIGHT + "px";
+          }
+        };
+
         const update = () => {
           const text = (sb.textContent || "").trim();
-          if (!text || text === DEFAULT) {
-            document.title = "rhwp-studio";
-            return;
+          let filename = "";
+          if (text && text !== DEFAULT) {
+            filename = text.split(SEPARATOR)[0].trim();
           }
-          const filename = text.split(SEPARATOR)[0].trim();
           document.title = filename ? filename + " - rhwp-studio" : "rhwp-studio";
+          if (titleEl) titleEl.textContent = filename;
         };
         update();
+        reposition();
         new MutationObserver(update).observe(sb, {
           childList: true,
           characterData: true,
           subtree: true,
         });
+        if (menuBar) {
+          new ResizeObserver(reposition).observe(menuBar);
+        }
       })();
     `);
   });
