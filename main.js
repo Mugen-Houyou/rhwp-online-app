@@ -20,6 +20,7 @@ const GRANTED_PERMISSIONS = new Set([
   "storage-access",              // 로컬 스토리지
   "top-level-storage-access",    // 로컬 스토리지 (최상위)
   "idle-detection",              // 유휴 감지
+  "local-fonts",                 // 로컬 글꼴 감지 (Local Font Access API)
 ]);
 
 function setupPermissions() {
@@ -60,6 +61,39 @@ function createWindow() {
   }
 
   const win = new BrowserWindow(winOptions);
+
+  // WASM 초기화 완료 감지 + 1초 안정화 지연 → 타이틀 바를 로딩 상태에서
+  // 정상 상태로 전환. 10초 안전망도 함께 설치.
+  const READY_DELAY_MS = 1000;
+  const READY_FALLBACK_MS = 10000;
+  let wasmReady = false;
+  let injectionDone = false;
+  const markReady = () => {
+    if (wasmReady && injectionDone) {
+      win.webContents
+        .executeJavaScript("window.__rhwpSetReady && window.__rhwpSetReady()")
+        .catch(() => {});
+    }
+  };
+  const scheduleReady = () => {
+    if (wasmReady) return;
+    setTimeout(() => {
+      wasmReady = true;
+      markReady();
+    }, READY_DELAY_MS);
+  };
+  win.webContents.on("console-message", (e) => {
+    if (/WasmBridge.*초기화\s*완료/.test(e.message)) {
+      scheduleReady();
+    }
+  });
+  // 안전망: 콘솔 신호가 안 오면 강제로 ready 전환
+  setTimeout(() => {
+    if (!wasmReady) {
+      wasmReady = true;
+      markReady();
+    }
+  }, READY_FALLBACK_MS);
 
   if (showTopbar) {
     const menu = Menu.buildFromTemplate([
@@ -155,11 +189,14 @@ function createWindow() {
 
     // 상태바(#sb-message)를 감시해 파일명을 document.title과 메뉴바 중앙에 반영
     // — rhwp-studio가 자체적으로 document.title을 갱신하지 않기 때문
+    // 초기 상태에서는 "RHWP 로드 중..."을 표시하고, 메인 프로세스가
+    // WASM 초기화 완료 신호를 감지하면 window.__rhwpSetReady()를 호출해
+    // 정상 상태로 전환한다.
     const injectTitleBar = !showTopbar;
-    win.webContents.executeJavaScript(`
+    win.webContents
+      .executeJavaScript(`
       (() => {
-        const sb = document.getElementById("sb-message");
-        if (!sb) return;
+        const LOADING_TEXT = "RHWP 로드 중...";
         const DEFAULT = "HWP 파일을 선택해주세요.";
         const SEPARATOR = " \u2014 "; // " — "
 
@@ -170,6 +207,7 @@ function createWindow() {
           if (menuBar) {
             titleEl = document.createElement("div");
             titleEl.id = "rhwp-title-bar";
+            titleEl.textContent = LOADING_TEXT;
             menuBar.appendChild(titleEl);
           }
         }
@@ -200,27 +238,49 @@ function createWindow() {
           }
         };
 
+        let ready = false;
         const update = () => {
-          const text = (sb.textContent || "").trim();
+          if (!ready) {
+            if (titleEl) titleEl.textContent = LOADING_TEXT;
+            reposition();
+            return;
+          }
+          const sb = document.getElementById("sb-message");
+          const text = ((sb && sb.textContent) || "").trim();
           let filename = "";
           if (text && text !== DEFAULT) {
             filename = text.split(SEPARATOR)[0].trim();
           }
           document.title = filename ? filename + " - rhwp-studio" : "rhwp-studio";
           if (titleEl) titleEl.textContent = filename;
+          reposition();
         };
+
+        window.__rhwpSetReady = () => {
+          if (ready) return;
+          ready = true;
+          const sb = document.getElementById("sb-message");
+          if (sb) {
+            new MutationObserver(update).observe(sb, {
+              childList: true,
+              characterData: true,
+              subtree: true,
+            });
+          }
+          update();
+        };
+
         update();
-        reposition();
-        new MutationObserver(update).observe(sb, {
-          childList: true,
-          characterData: true,
-          subtree: true,
-        });
         if (menuBar) {
           new ResizeObserver(reposition).observe(menuBar);
         }
       })();
-    `);
+    `)
+      .then(() => {
+        injectionDone = true;
+        markReady();
+      })
+      .catch(() => {});
   });
 
   win.loadURL(RHWP_URL);
