@@ -323,23 +323,21 @@ app.whenReady().then(() => {
 app.on("window-all-closed", () => {
   if (updateDownloaded) {
     const win = new BrowserWindow({
-      width: 380,
-      height: 170,
+      width: 360,
+      height: 140,
       resizable: false,
       minimizable: false,
       maximizable: false,
       closable: false,
       frame: false,
-      transparent: true,
       alwaysOnTop: true,
       show: false,
       webPreferences: { contextIsolation: true, nodeIntegration: false },
     });
     win.loadURL(`data:text/html;charset=utf-8,
-      <html><body style="margin:0;background:transparent;font-family:'Malgun Gothic',sans-serif;
+      <html><body style="margin:0;background:%23fff;font-family:'Malgun Gothic',sans-serif;
         user-select:none;display:flex;align-items:center;justify-content:center;height:100vh">
-        <div style="background:%23fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.15);
-          padding:28px 32px;display:flex;align-items:center;gap:20px;max-width:340px">
+        <div style="display:flex;align-items:center;gap:20px">
           <img src="${APP_ICON_URI}" width="40" height="40"
             style="flex-shrink:0;border-radius:8px" />
           <div>
@@ -348,11 +346,11 @@ app.on("window-all-closed", () => {
             <p style="margin:0 0 12px;font-size:12px;color:%23888">잠시만 기다려주세요.</p>
             <div style="height:4px;border-radius:2px;background:%23e0e0e0;overflow:hidden">
               <div style="height:100%25;border-radius:2px;background:%234a90d9;
-                animation:progress 1.5s ease-in-out infinite;width:40%25"></div>
+                animation:progress 1s cubic-bezier(.4,0,.6,1) infinite alternate;width:30%25"></div>
             </div>
           </div>
         </div>
-        <style>@keyframes progress{0%25{margin-left:0;width:30%25}50%25{width:50%25}100%25{margin-left:100%25;width:30%25}}</style>
+        <style>@keyframes progress{0%25{transform:translateX(0)}100%25{transform:translateX(233%25)}}</style>
       </body></html>`);
     win.once("ready-to-show", () => {
       win.show();
