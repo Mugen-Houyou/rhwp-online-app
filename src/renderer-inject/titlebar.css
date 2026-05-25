@@ -1,0 +1,26 @@
+/* 창 컨트롤 오버레이(최소화/최대화/닫기)와 겹치지 않도록 여백 확보 */
+#menu-bar {
+  padding-right: 140px !important;
+  -webkit-app-region: drag;
+  position: relative !important;
+}
+/* 메뉴 항목은 클릭 가능해야 하므로 드래그 제외 */
+#menu-bar .menu-item {
+  -webkit-app-region: no-drag;
+}
+/* VS Code 스타일 중앙 타이틀 표시 — left/right는 JS가
+   메뉴 항목 실측 폭에 따라 동적으로 설정 */
+#rhwp-title-bar {
+  position: absolute;
+  top: 0;
+  height: 27px;
+  line-height: 27px;
+  font-size: 12px;
+  color: #555;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  -webkit-app-region: drag;
+}
