@@ -1,6 +1,6 @@
 {
   "name": "rhwp-online-app",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "RHWP - Desktop App",
   "main": "main.js",
   "scripts": {
@@ -22,6 +22,9 @@
         "nsis",
         "portable"
       ]
+    },
+    "portable": {
+      "artifactName": "${productName}-Portable-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
