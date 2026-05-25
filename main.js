@@ -239,6 +239,8 @@ function createWindow() {
         };
 
         let ready = false;
+        let lastFilename = "";
+        const HWP_EXT = /\\.(?:hwp|hwpx|hwt|hml|hwpml)$/i;
         const update = () => {
           if (!ready) {
             if (titleEl) titleEl.textContent = LOADING_TEXT;
@@ -249,7 +251,11 @@ function createWindow() {
           const text = ((sb && sb.textContent) || "").trim();
           let filename = "";
           if (text && text !== DEFAULT) {
-            filename = text.split(SEPARATOR)[0].trim();
+            const candidate = text.split(SEPARATOR)[0].trim();
+            if (HWP_EXT.test(candidate)) {
+              lastFilename = candidate;
+            }
+            filename = lastFilename;
           }
           document.title = filename ? filename + " - rhwp-studio" : "rhwp-studio";
           if (titleEl) titleEl.textContent = filename;
