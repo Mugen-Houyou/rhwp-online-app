@@ -307,6 +307,84 @@ function createWindow() {
         if (menuBar) {
           new ResizeObserver(reposition).observe(menuBar);
         }
+
+        // "제품 정보" 항목 뒤에 "RHWP Online 정보" 삽입
+        if (!document.getElementById("rhwp-online-about")) {
+          const aboutItem = document.querySelector('.md-item[data-cmd="file:about"]');
+          if (aboutItem) {
+            const onlineAbout = document.createElement("div");
+            onlineAbout.id = "rhwp-online-about";
+            onlineAbout.className = "md-item";
+            onlineAbout.innerHTML = '<span class="md-icon icon-help"></span><span class="md-label">RHWP Online 정보</span>';
+            aboutItem.after(onlineAbout);
+
+            onlineAbout.addEventListener("click", (e) => {
+              // 문서 레벨 메뉴 자동닫기 핸들러를 막고, 수동으로 닫는다.
+              // (RHWP 커맨드 핸들러는 [data-cmd] 선택자라 우리 항목엔 매치되지 않음)
+              e.stopPropagation();
+              document.querySelectorAll("#menu-bar > .menu-item.open").forEach(m => m.classList.remove("open"));
+
+              // 기존 다이얼로그가 열려 있으면 무시
+              if (document.getElementById("rhwp-online-about-dialog")) return;
+
+              const overlay = document.createElement("div");
+              overlay.id = "rhwp-online-about-dialog";
+              overlay.className = "modal-overlay";
+              overlay.innerHTML = \`
+                <div class="dialog-wrap" style="width:400px">
+                  <div class="dialog-title">
+                    <span>RHWP Online 정보</span>
+                    <button class="dialog-close" id="rhwp-online-about-close">&times;</button>
+                  </div>
+                  <div class="about-body">
+                    <div class="about-product-name">RHWP Online</div>
+                    <div class="about-version">Version ${require("./package.json").version}</div>
+                    <div class="about-notice" style="text-align:center">
+                      <div style="margin-bottom:8px"><strong>제작자</strong></div>
+                      <a href="#" id="rhwp-online-about-author"
+                        style="color:#2c3e6b;text-decoration:underline">Mugen-Houyou</a>
+                    </div>
+                    <div class="about-notice" style="text-align:center">
+                      <div style="margin-bottom:8px"><strong>저장소</strong></div>
+                      <a href="#" id="rhwp-online-about-repo"
+                        style="color:#2c3e6b;text-decoration:underline">
+                        github.com/Mugen-Houyou/rhwp-online-app</a>
+                    </div>
+                    <div class="about-notice" style="text-align:left">
+                      <div style="margin-bottom:8px"><strong>라이선스</strong></div>
+                      <div>MIT License</div>
+                      <div style="margin-top:6px;font-size:12px;color:#888">
+                        이 프로그램은 <a href="#" id="rhwp-online-about-upstream"
+                          style="color:#2c3e6b;text-decoration:underline">edwardkim/rhwp</a>
+                        웹 앱을 Electron으로 감싼 데스크톱 클라이언트입니다.
+                      </div>
+                    </div>
+                    <div class="about-copyright">&copy; \${new Date().getFullYear() > 2026 ? "2026-" + new Date().getFullYear() : "2026"} Mugen-Houyou</div>
+                  </div>
+                </div>\`;
+              document.body.appendChild(overlay);
+
+              // 닫기
+              const close = () => overlay.remove();
+              overlay.querySelector("#rhwp-online-about-close").addEventListener("click", close);
+              overlay.addEventListener("click", (ev) => { if (ev.target === overlay) close(); });
+
+              // 링크 → 외부 브라우저 (Electron이 shell.openExternal로 처리)
+              overlay.querySelector("#rhwp-online-about-author").addEventListener("click", (ev) => {
+                ev.preventDefault();
+                window.open("https://github.com/Mugen-Houyou", "_blank");
+              });
+              overlay.querySelector("#rhwp-online-about-repo").addEventListener("click", (ev) => {
+                ev.preventDefault();
+                window.open("https://github.com/Mugen-Houyou/rhwp-online-app", "_blank");
+              });
+              overlay.querySelector("#rhwp-online-about-upstream").addEventListener("click", (ev) => {
+                ev.preventDefault();
+                window.open("https://github.com/edwardkim/rhwp", "_blank");
+              });
+            });
+          }
+        }
       })();
     `)
       .then(() => {
