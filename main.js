@@ -1,10 +1,8 @@
 const { app, BrowserWindow, dialog, shell, Menu, session } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const path = require("path");
-const fs = require("fs");
 
-const APP_ICON_URI = "data:image/png;base64," +
-  fs.readFileSync(path.join(__dirname, "build", "icon.png")).toString("base64");
+const APP_ICON_URI = require("./icon.js");
 
 const RHWP_URL = "https://edwardkim.github.io/rhwp/";
 const RHWP_ORIGIN = "https://edwardkim.github.io";
