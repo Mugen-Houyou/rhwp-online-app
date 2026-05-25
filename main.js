@@ -1,6 +1,10 @@
-const { app, BrowserWindow, shell, Menu, session } = require("electron");
+const { app, BrowserWindow, dialog, shell, Menu, session } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const path = require("path");
+const fs = require("fs");
+
+const APP_ICON_URI = "data:image/png;base64," +
+  fs.readFileSync(path.join(__dirname, "build", "icon.png")).toString("base64");
 
 const RHWP_URL = "https://edwardkim.github.io/rhwp/";
 const RHWP_ORIGIN = "https://edwardkim.github.io";
@@ -292,14 +296,60 @@ function createWindow() {
   win.loadURL(RHWP_URL);
 }
 
+let updateDownloaded = false;
+
 app.whenReady().then(() => {
   setupPermissions();
   createWindow();
+
+  autoUpdater.on("update-downloaded", () => {
+    updateDownloaded = true;
+  });
+
   autoUpdater.checkForUpdatesAndNotify().catch(() => {});
 });
 
 app.on("window-all-closed", () => {
-  app.quit();
+  if (updateDownloaded) {
+    const win = new BrowserWindow({
+      width: 380,
+      height: 170,
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      closable: false,
+      frame: false,
+      transparent: true,
+      alwaysOnTop: true,
+      show: false,
+      webPreferences: { contextIsolation: true, nodeIntegration: false },
+    });
+    win.loadURL(`data:text/html;charset=utf-8,
+      <html><body style="margin:0;background:transparent;font-family:'Malgun Gothic',sans-serif;
+        user-select:none;display:flex;align-items:center;justify-content:center;height:100vh">
+        <div style="background:%23fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.15);
+          padding:28px 32px;display:flex;align-items:center;gap:20px;max-width:340px">
+          <img src="${APP_ICON_URI}" width="40" height="40"
+            style="flex-shrink:0;border-radius:8px" />
+          <div>
+            <p style="margin:0 0 8px;font-size:14px;color:%23333;font-weight:600">
+              RHWP 업데이트를 설치하고 있습니다…</p>
+            <p style="margin:0 0 12px;font-size:12px;color:%23888">잠시만 기다려주세요.</p>
+            <div style="height:4px;border-radius:2px;background:%23e0e0e0;overflow:hidden">
+              <div style="height:100%25;border-radius:2px;background:%234a90d9;
+                animation:progress 1.5s ease-in-out infinite;width:40%25"></div>
+            </div>
+          </div>
+        </div>
+        <style>@keyframes progress{0%25{margin-left:0;width:30%25}50%25{width:50%25}100%25{margin-left:100%25;width:30%25}}</style>
+      </body></html>`);
+    win.once("ready-to-show", () => {
+      win.show();
+      autoUpdater.quitAndInstall(true, false);
+    });
+  } else {
+    app.quit();
+  }
 });
 
 app.on("activate", () => {
