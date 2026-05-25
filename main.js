@@ -146,6 +146,19 @@ function createWindow() {
     win.setTitle(title.replace("rhwp-studio", "RHWP"));
   });
 
+  // beforeunload가 창 닫기를 막을 때 확인 대화상자 표시
+  win.webContents.on("will-prevent-unload", (event) => {
+    const choice = dialog.showMessageBoxSync(win, {
+      type: "question",
+      buttons: ["종료", "취소"],
+      defaultId: 1,
+      cancelId: 1,
+      title: "RHWP",
+      message: "저장하지 않은 변경사항이 있을 수 있습니다.\n종료하시겠습니까?",
+    });
+    if (choice === 0) event.preventDefault();
+  });
+
   // 파일 다운로드(내보내기/저장) — 저장 대화상자 표시
   session.defaultSession.on("will-download", (event, item) => {
     // Electron 기본 동작: 저장 대화상자 표시 후 다운로드
