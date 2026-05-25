@@ -4,6 +4,18 @@ const path = require("path");
 
 const APP_ICON_URI = require("./icon.js");
 
+// 단일 프로세스 다중 창: 이미 실행 중이면 기존 인스턴스에 위임
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  process.exit(0);
+} else {
+  app.on("second-instance", () => {
+    const win = createWindow();
+    if (win.isMinimized()) win.restore();
+    win.focus();
+  });
+}
+
 const RHWP_URL = "https://edwardkim.github.io/rhwp/";
 const RHWP_ORIGIN = "https://edwardkim.github.io";
 
@@ -305,6 +317,7 @@ function createWindow() {
   });
 
   win.loadURL(RHWP_URL);
+  return win;
 }
 
 let updateDownloaded = false;
@@ -366,3 +379,4 @@ app.on("activate", () => {
     createWindow();
   }
 });
+
