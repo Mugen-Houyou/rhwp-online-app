@@ -91,15 +91,12 @@
 
   // "새로 만들기" 가로채기 — 이미 파일이 열린 상태라면 새 창에서 열기.
   // 파일이 없으면 그대로 통과시켜 업스트림이 현재 창에서 새 문서를 만들게 둔다.
-  // 관찰자 setup 이전 클릭에서도 안전하도록 #sb-message를 즉시 조회.
+  // HWPX 변환 중 #sb-message가 파일명이 아닌 상태 메시지를 표시하므로
+  // 직접 조회 대신 update()가 관리하는 lastFilename 캐시를 사용한다.
   document.addEventListener("click", (e) => {
     const item = e.target.closest('.md-item[data-cmd="file:new-doc"]:not(.disabled)');
     if (!item) return;
-    const sb = document.getElementById("sb-message");
-    const text = ((sb && sb.textContent) || "").trim();
-    if (!text || text === DEFAULT) return;
-    const candidate = text.split(SEPARATOR)[0].trim();
-    if (!HWP_EXT.test(candidate)) return;
+    if (!lastFilename) return;
     // 파일 열림 → 업스트림 동작 차단 + 새 창
     e.stopImmediatePropagation();
     e.preventDefault();
