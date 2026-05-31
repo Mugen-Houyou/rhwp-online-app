@@ -148,11 +148,13 @@
               </div>
               <div class="about-notice" style="text-align:left">
                 <div style="margin-bottom:8px"><strong>라이선스</strong></div>
-                <div>MIT License</div>
+                <div>이 프로그램은 MIT License로 배포됩니다.</div>
                 <div style="margin-top:6px;font-size:12px;color:#888">
-                  이 프로그램은 <a href="#" id="rhwp-online-about-upstream"
+                  <a href="#" id="rhwp-online-about-upstream"
                     style="color:#2c3e6b;text-decoration:underline">edwardkim/rhwp</a>
                   웹 앱을 Electron으로 감싼 데스크톱 클라이언트입니다.
+                  원본 웹 앱과 로고의 저작권은 Edward Kim(&copy; ${new Date().getFullYear() > 2025 ? "2025-" + new Date().getFullYear() : "2025"})에게 있으며,
+                  원본 또한 MIT License로 제공됩니다.
                 </div>
               </div>
               <div class="about-copyright">&copy; ${new Date().getFullYear() > 2026 ? "2026-" + new Date().getFullYear() : "2026"} Mugen-Houyou</div>
