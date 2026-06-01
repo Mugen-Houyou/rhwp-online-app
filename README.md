@@ -1,13 +1,6 @@
 # RHWP Online
 
-[edwardkim/rhwp](https://github.com/edwardkim/rhwp)님의 [RHWP 프로젝트](https://github.com/edwardkim/rhwp)의 [웹앱](https://edwardkim.github.io/rhwp/)을 감싸는 Windows 데스크톱 셸입니다.
-
-## 기능
-
-- 커스텀 타이틀바: 기본 Windows 타이틀바를 숨기고 웹앱 메뉴바에 창 컨트롤 오버레이를 통합
-- 데스크톱 권한 선승인: 클립보드, 파일 시스템, 알림, 전체 화면, 유휴 감지 등
-- File System Access API 허용으로 문서 열기/저장 지원
-- 외부 링크는 기본 브라우저로, 같은 출처 팝업은 앱 내 새 창으로 처리
+[edwardkim/rhwp](https://github.com/edwardkim/rhwp)님의 [RHWP 프로젝트](https://github.com/edwardkim/rhwp)의 [웹버전](https://edwardkim.github.io/rhwp/)을 감싸는 Windows 프로그램입니다.
 
 ## 개발
 
