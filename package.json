@@ -1,6 +1,6 @@
 {
   "name": "rhwp-online-app",
-  "version": "1.0.18",
+  "version": "1.0.19",
   "description": "RHWP - Desktop App",
   "main": "main.js",
   "scripts": {

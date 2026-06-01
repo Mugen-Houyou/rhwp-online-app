@@ -104,6 +104,96 @@
     window.open(window.location.href, "rhwp-shell-new-window");
   }, true);
 
+  // ── 로컬 글꼴: 감지 결과를 창 간 공유(localStorage) + #font-name에 주입 ──
+  // 업스트림은 "로컬 글꼴 감지하기"가 모듈 캐시(창 로컬·비영속)만 채우고
+  // 드롭다운을 다시 그리지 않으며, 그 캐시는 새 창으로 전파되지 않는다.
+  // 우리는 감지 결과를 localStorage(창 간 공유 세션)에 저장해두고, 각 창이
+  // 읽어 #font-name에 "로컬 글꼴" optgroup을 주입한다. 표준 queryLocalFonts()
+  // 는 사용자 제스처를 요구하므로 최초 1회는 감지 버튼 클릭이 필요하지만,
+  // 이후 다른 창은 저장된 목록을 제스처 없이 재사용한다.
+  const FONTS_KEY = "__rhwpShellLocalFonts";
+
+  const getStoredFonts = () => {
+    try {
+      const a = JSON.parse(localStorage.getItem(FONTS_KEY) || "[]");
+      return Array.isArray(a) ? a : [];
+    } catch {
+      return [];
+    }
+  };
+
+  // #font-name에 "로컬 글꼴" optgroup 주입. 멱등 — 이미 있으면 no-op이라
+  // MutationObserver 콜백에서 반복 호출해도 안전(루프 방지).
+  const ensureLocalFonts = () => {
+    const sel = document.getElementById("font-name");
+    if (!sel || sel.querySelector('optgroup[label="로컬 글꼴"]')) return;
+    // 대표 글꼴(value="__fontset__<이름>")과 동명인 항목은 제외(화면 중복 방지)
+    const repNames = new Set(
+      Array.from(sel.querySelectorAll('optgroup[label="대표 글꼴"] option'))
+        .map((o) => o.value.replace(/^__fontset__/, ""))
+    );
+    const families = getStoredFonts().filter((f) => !repNames.has(f));
+    if (!families.length) return;
+    const group = document.createElement("optgroup");
+    group.label = "로컬 글꼴";
+    families.forEach((fam) => {
+      const opt = document.createElement("option");
+      opt.value = fam;       // populateLocalFontOptions와 동일 형식
+      opt.textContent = fam; // → 선택 시 업스트림 change 핸들러가 동일 처리
+      group.appendChild(opt);
+    });
+    // 업스트림과 동일하게 "대표 글꼴" optgroup 다음에 삽입(없으면 끝에)
+    const rep = sel.querySelector('optgroup[label="대표 글꼴"]');
+    sel.insertBefore(group, rep ? rep.nextSibling : null);
+  };
+
+  // ① 감지 버튼 클릭 → queryLocalFonts()로 조회해 localStorage 저장 후 주입.
+  document.addEventListener("click", (e) => {
+    // opt-fontset-btn 클래스는 "대표 글꼴 등록하기" 버튼과 공유되므로
+    // 버튼 텍스트로 "로컬 글꼴 감지하기"를 구분한다(\s* 로 띄어쓰기 변형 허용).
+    const btn = e.target.closest(".opt-fontset-btn");
+    if (!btn || !/로컬\s*글꼴\s*감지/.test(btn.textContent || "")) return;
+    if (typeof window.queryLocalFonts !== "function") return;
+    // stopPropagation 금지: 업스트림 핸들러도 실행되어 자체 캐시·상태 라벨을
+    // 갱신하게 둔다. queryLocalFonts()는 이 클릭 제스처 안에서 호출해야
+    // 권한(user activation)이 유지되므로 setTimeout 등으로 지연하지 말 것.
+    window.queryLocalFonts().then((fonts) => {
+      const families = Array.from(
+        new Set(fonts.map((f) => f.family).filter(Boolean))
+      ).sort((a, b) => a.localeCompare(b, "ko"));
+      try {
+        localStorage.setItem(FONTS_KEY, JSON.stringify(families));
+      } catch {}
+      // 갱신: 기존 optgroup 제거 후 저장 목록으로 다시 채움
+      const sel = document.getElementById("font-name");
+      if (sel) sel.querySelectorAll('optgroup[label="로컬 글꼴"]').forEach((g) => g.remove());
+      ensureLocalFonts();
+    }).catch(() => {}); // 권한 거부/취소 등 — 업스트림 핸들러가 상태 라벨로 피드백
+  }, true);
+
+  // ② #font-name은 정적 노드. initFontDropdown이 문서 열기 시 replaceChildren로
+  // 드롭다운을 비우므로, childList를 감시해 우리 optgroup을 재주입한다.
+  // 업스트림 초기화 연쇄(replaceChildren→대표 글꼴 주입→…)가 안정된 뒤
+  // 1회만 채우도록 짧게 debounce — 대표 글꼴 제외 정확도 + 옵저버 루프 방지.
+  const fontSel = document.getElementById("font-name");
+  if (fontSel) {
+    let pending = false;
+    const schedule = () => {
+      if (pending) return;
+      pending = true;
+      setTimeout(() => {
+        pending = false;
+        ensureLocalFonts();
+      }, 50);
+    };
+    new MutationObserver(schedule).observe(fontSel, { childList: true });
+    schedule(); // ③ 시작 시: 다른 창이 저장해둔 목록이 있으면 즉시 반영
+    // 이미 열린 다른 창에서 감지 시 실시간 반영(Electron 다중 창에서 발동 시)
+    window.addEventListener("storage", (ev) => {
+      if (ev.key === FONTS_KEY) ensureLocalFonts();
+    });
+  }
+
   // "제품 정보" 항목 뒤에 "RHWP Online 정보" 삽입
   if (!document.getElementById("rhwp-online-about")) {
     const aboutItem = document.querySelector('.md-item[data-cmd="file:about"]');
