@@ -127,12 +127,14 @@
   const ensureLocalFonts = () => {
     const sel = document.getElementById("font-name");
     if (!sel || sel.querySelector('optgroup[label="로컬 글꼴"]')) return;
-    // 대표 글꼴(value="__fontset__<이름>")과 동명인 항목은 제외(화면 중복 방지)
-    const repNames = new Set(
-      Array.from(sel.querySelectorAll('optgroup[label="대표 글꼴"] option'))
-        .map((o) => o.value.replace(/^__fontset__/, ""))
+    // 이미 최상위 옵션으로 존재하는 글꼴은 제외해 화면 중복을 막는다.
+    // initFontDropdown이 넣는 BASE_FONTS(맑은 고딕·나눔고딕·바탕·돋움·궁서 등)와
+    // 문서 글꼴이 여기 해당. 대표 글꼴 항목은 optgroup 내부라 ":scope > option"에
+    // 잡히지 않고, value도 "__fontset__<세트명>"이라 family명과 충돌하지 않는다.
+    const existing = new Set(
+      Array.from(sel.querySelectorAll(":scope > option")).map((o) => o.value)
     );
-    const families = getStoredFonts().filter((f) => !repNames.has(f));
+    const families = getStoredFonts().filter((f) => !existing.has(f));
     if (!families.length) return;
     const group = document.createElement("optgroup");
     group.label = "로컬 글꼴";
@@ -145,6 +147,20 @@
     // 업스트림과 동일하게 "대표 글꼴" optgroup 다음에 삽입(없으면 끝에)
     const rep = sel.querySelector('optgroup[label="대표 글꼴"]');
     sel.insertBefore(group, rep ? rep.nextSibling : null);
+  };
+
+  // "로컬 글꼴" optgroup을 강제 갱신: 기존 그룹 제거 후 저장 목록으로 재주입.
+  // ensureLocalFonts는 멱등(이미 있으면 no-op)이라 "내용 변경"은 반영하지 못하므로,
+  // 목록이 바뀌는 경로(감지 직후·다른 창의 storage 이벤트)에서는 이 함수를 쓴다.
+  // 저장 키가 비워졌으면 제거만 되고 재주입은 스킵된다(빈 목록 → ensureLocalFonts no-op).
+  // 제거→재주입이 MutationObserver를 깨우지만, 옵저버 콜백은 멱등 ensureLocalFonts를
+  // 호출하므로(재귀적 refresh 아님) 루프가 생기지 않는다.
+  const refreshLocalFonts = () => {
+    const sel = document.getElementById("font-name");
+    if (sel) {
+      sel.querySelectorAll('optgroup[label="로컬 글꼴"]').forEach((g) => g.remove());
+    }
+    ensureLocalFonts();
   };
 
   // ① 감지 버튼 클릭 → queryLocalFonts()로 조회해 localStorage 저장 후 주입.
@@ -164,10 +180,7 @@
       try {
         localStorage.setItem(FONTS_KEY, JSON.stringify(families));
       } catch {}
-      // 갱신: 기존 optgroup 제거 후 저장 목록으로 다시 채움
-      const sel = document.getElementById("font-name");
-      if (sel) sel.querySelectorAll('optgroup[label="로컬 글꼴"]').forEach((g) => g.remove());
-      ensureLocalFonts();
+      refreshLocalFonts(); // 기존 optgroup 제거 후 갓 저장한 목록으로 다시 채움
     }).catch(() => {}); // 권한 거부/취소 등 — 업스트림 핸들러가 상태 라벨로 피드백
   }, true);
 
@@ -188,9 +201,12 @@
     };
     new MutationObserver(schedule).observe(fontSel, { childList: true });
     schedule(); // ③ 시작 시: 다른 창이 저장해둔 목록이 있으면 즉시 반영
-    // 이미 열린 다른 창에서 감지 시 실시간 반영(Electron 다중 창에서 발동 시)
+    // 이미 열린 다른 창에서 감지/갱신 시 실시간 반영(Electron 다중 창). storage
+    // 이벤트는 값을 바꾼 창이 아닌 "다른" 창에서만 발생하므로, 쓰기 창은 ①에서
+    // 직접 refreshLocalFonts를 호출하고 나머지 창은 여기서 갱신한다. ensureLocalFonts는
+    // 멱등이라 기존 optgroup의 내용 변경을 못 잡으므로 refreshLocalFonts로 강제 갱신.
     window.addEventListener("storage", (ev) => {
-      if (ev.key === FONTS_KEY) ensureLocalFonts();
+      if (ev.key === FONTS_KEY) refreshLocalFonts();
     });
   }
 
