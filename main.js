@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, shell, Menu, session } = require("electron");
+const { app, BrowserWindow, dialog, shell, Menu, session, ipcMain, nativeTheme } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const fs = require("fs");
@@ -58,6 +58,17 @@ function setupPermissions() {
   });
 }
 
+// 테마별 네이티브 타이틀바 오버레이 색 (업스트림 --ui-bg-light / --ui-text 대응)
+const OVERLAY_THEME = {
+  light: { color: "#f5f5f5", symbolColor: "#333333" }, // 라이트: 메뉴바 bg / 텍스트
+  dark:  { color: "#2b3037", symbolColor: "#eef1f5" }, // 다크:  메뉴바 bg / 텍스트
+};
+// data-theme-effective("light"|"dark") → setTitleBarOverlay 인자 (height 유지)
+const overlayFor = (eff) => ({
+  ...(OVERLAY_THEME[eff] || OVERLAY_THEME.light),
+  height: 27, // 메뉴바 높이(28px) - border(1px)
+});
+
 function createWindow() {
   const winOptions = {
     width: 1280,
@@ -65,6 +76,7 @@ function createWindow() {
     title: "RHWP",
     icon: path.join(__dirname, "build", "icon.png"),
     webPreferences: {
+      preload: path.join(__dirname, "src/preload/theme-bridge.js"),
       contextIsolation: true,
       nodeIntegration: false,
       spellcheck: true,
@@ -74,11 +86,8 @@ function createWindow() {
   // 타이틀바 통합: Windows 타이틀바 숨기고 메뉴바 우측에 창 컨트롤 오버레이
   if (!showTopbar) {
     winOptions.titleBarStyle = "hidden";
-    winOptions.titleBarOverlay = {
-      color: "#f5f5f5",       // 메뉴바 배경색 (--color-bg-light)
-      symbolColor: "#333333", // 메뉴바 텍스트색 (--color-text)
-      height: 27,             // 메뉴바 높이(28px) - border(1px)
-    };
+    // 초기값은 OS 다크 여부로 추정(앱 기본 모드가 system) → preload가 로드 후 정밀 보정
+    winOptions.titleBarOverlay = overlayFor(nativeTheme.shouldUseDarkColors ? "dark" : "light");
   }
 
   const win = new BrowserWindow(winOptions);
@@ -227,6 +236,16 @@ let updateDownloaded = false;
 
 app.whenReady().then(() => {
   setupPermissions();
+
+  // 렌더러(preload)가 보고한 웹앱 테마로 네이티브 타이틀바 오버레이 색 갱신
+  ipcMain.on("rhwp-theme", (event, eff) => {
+    if (showTopbar) return; // 네이티브 메뉴 모드는 오버레이 없음
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) {
+      try { win.setTitleBarOverlay(overlayFor(eff)); } catch {}
+    }
+  });
+
   createWindow();
 
   autoUpdater.on("update-downloaded", () => {
