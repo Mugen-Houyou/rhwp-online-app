@@ -233,6 +233,15 @@
         overlay.id = "rhwp-online-about-dialog";
         overlay.className = "modal-overlay";
         overlay.innerHTML = `
+          <style>
+            /* 링크색은 업스트림 테마 토큰을 사용 — 라이트(#2563eb)/다크(#8bb8ff)를
+               data-theme-effective에 따라 자동 적용. 업스트림도 다이얼로그 링크에
+               동일 토큰을 쓴다(.eq-latex-hint a, local-fonts-modal 등). */
+            #rhwp-online-about-dialog a {
+              color: var(--ui-link, #2563eb);
+              text-decoration: underline;
+            }
+          </style>
           <div class="dialog-wrap" style="width:400px">
             <div class="dialog-title">
               <span>RHWP Online 정보</span>
@@ -243,21 +252,18 @@
               <div class="about-version">Version ${version}</div>
               <div class="about-notice" style="text-align:center">
                 <div style="margin-bottom:8px"><strong>제작자</strong></div>
-                <a href="#" id="rhwp-online-about-author"
-                  style="color:#2c3e6b;text-decoration:underline">Mugen-Houyou</a>
+                <a href="#" id="rhwp-online-about-author">Mugen-Houyou</a>
               </div>
               <div class="about-notice" style="text-align:center">
                 <div style="margin-bottom:8px"><strong>저장소</strong></div>
-                <a href="#" id="rhwp-online-about-repo"
-                  style="color:#2c3e6b;text-decoration:underline">
+                <a href="#" id="rhwp-online-about-repo">
                   github.com/Mugen-Houyou/rhwp-online-app</a>
               </div>
               <div class="about-notice" style="text-align:left">
                 <div style="margin-bottom:8px;text-align:center"><strong>라이선스</strong></div>
                 <div>이 프로그램은 MIT License로 배포됩니다.</div>
-                <div style="margin-top:6px;font-size:12px;color:#888">
-                  <a href="#" id="rhwp-online-about-upstream"
-                    style="color:#2c3e6b;text-decoration:underline">edwardkim/rhwp</a>
+                <div style="margin-top:6px;font-size:12px;color:var(--ui-text-muted, #888)">
+                  <a href="#" id="rhwp-online-about-upstream">edwardkim/rhwp</a>
                   웹 앱을 Electron으로 감싼 데스크톱 클라이언트입니다.
                   원본 웹 앱과 로고의 저작권은 Edward Kim에게 있으며,
                   원본 또한 MIT License로 제공됩니다.
