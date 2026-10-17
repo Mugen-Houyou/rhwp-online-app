@@ -10,9 +10,12 @@ yarn-error.log*
 # Editor / OS
 .vscode/
 .idea/
-.claude/
 .DS_Store
 Thumbs.db
+
+# Claude Code — local settings stay out; repo skills are tracked
+.claude/*
+!.claude/skills/
 
 # Env
 .env

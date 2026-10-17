@@ -1,2 +1,3 @@
 src/renderer-inject/* text eol=lf
 src/dialogs/* text eol=lf
+.claude/skills/** text eol=lf
