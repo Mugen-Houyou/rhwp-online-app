@@ -11,6 +11,7 @@ const { RHWP_URL, overlayFor, attachShellPolicy } = require("./src/main/shell-po
 // 렌더러에 주입할 코드/마크업 — 모듈 로드 시 한 번 읽어 캐시 (다중 창마다 재읽기 불필요)
 const TITLEBAR_JS  = fs.readFileSync(path.join(__dirname, "src/renderer-inject/titlebar.js"), "utf8");
 const TITLEBAR_CSS = fs.readFileSync(path.join(__dirname, "src/renderer-inject/titlebar.css"), "utf8");
+const WASM_RECOVERY_JS = fs.readFileSync(path.join(__dirname, "src/renderer-inject/wasm-recovery.js"), "utf8");
 const UPDATE_HTML  = fs.readFileSync(path.join(__dirname, "src/dialogs/update-progress.html"), "utf8");
 
 // 단일 프로세스 다중 창: 이미 실행 중이면 기존 인스턴스에 위임
@@ -87,7 +88,7 @@ function createWindow() {
 
   // WASM 초기화 완료 감지 + 1초 안정화 지연 → 타이틀 바를 로딩 상태에서
   // 정상 상태로 전환. 모든 신호가 모인 뒤 추가로 READY_HOLD_MS만큼
-  // "로드 중..." 텍스트를 더 노출. 10초 안전망도 함께 설치.
+  // "로딩 중..." 텍스트를 더 노출. 10초 안전망도 함께 설치.
   const READY_DELAY_MS = 1000;
   const READY_HOLD_MS = 1000;
   const READY_FALLBACK_MS = 10000;
@@ -109,9 +110,33 @@ function createWindow() {
       markReady();
     }, READY_DELAY_MS);
   };
+  // WASM 404 자동 복구: 업스트림 재배포 직후 서비스 워커가 옛 앱 셸을 띄우면 옛 해시의 wasm이 서버에
+  // 없어 "WASM 초기화 실패: …"가 난다. 새 SW는 페이지를 다시 불러오지 않으므로 시작 단계에서 대신 한다.
+  //  - 1차: SW 갱신(느린 망에서는 설치 완료)을 기다렸다가 재로드
+  //  - 2차: 그래도 실패하면 렌더러가 controllerchange를 구독해 새 SW가 넘겨받는 순간 스스로 재로드
+  //  - 3차 이후는 손대지 않는다(루프 방지). 재로드는 창당 최대 3회.
+  // 실패 문구는 옛 셸의 wasm 로더 버전에 따라 다르므로("… HTTP status code is not ok" /
+  // "failed to fetch Wasm: 404 …") 특정 문구에 묶지 않고, 재로드가 소용없는 순수 네트워크 단절(fetch의
+  // "Failed to fetch")만 제외한다. 배경과 렌더러 쪽 동작은 src/renderer-inject/wasm-recovery.js 참조
+  const isRecoverableWasmFailure = (msg) => /WASM 초기화 실패/.test(msg) && !/Failed to fetch/.test(msg);
+  let wasmInitDone = false; // 실제 "초기화 완료" 로그에만 세운다 — 10초 안전망(wasmReady)과는 별개
+  let wasmRecoveryAttempts = 0;
+  const recoverFromWasmFetchFailure = async () => {
+    if (wasmInitDone || wasmRecoveryAttempts >= 2) return;
+    const attempt = ++wasmRecoveryAttempts;
+    let outcome = "error";
+    try {
+      outcome = await win.webContents.executeJavaScript(`(${WASM_RECOVERY_JS})(${JSON.stringify({ attempt })})`);
+    } catch {}
+    if (win.isDestroyed() || outcome === "has-document" || outcome === "armed") return;
+    win.webContents.reload(); // "updated" | "timeout" | "no-sw" | "reload-now" | "error"
+  };
   win.webContents.on("console-message", (e) => {
     if (/WasmBridge.*초기화\s*완료/.test(e.message)) {
+      wasmInitDone = true;
       scheduleReady();
+    } else if (isRecoverableWasmFailure(e.message)) {
+      recoverFromWasmFetchFailure();
     }
   });
   // 안전망: 콘솔 신호가 안 오면 강제로 ready 전환

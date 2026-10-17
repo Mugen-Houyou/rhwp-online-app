@@ -8,17 +8,21 @@
   // 표시 문자열 — 업스트림이 <html lang>을 유효 로케일(ko|en)로 맞춘다(locale-init.js / i18n/dom.ts).
   // 현재 업스트림엔 언어 선택 UI가 없어 기본은 ko. 테마·스킨 라벨은 업스트림 레지스트리 라벨을 우선 쓰고
   // 아래 값은 폴백(업스트림 ko/en 카탈로그와 같은 단어).
+  // 문구 규칙(래퍼 전체 공통 — wasm-recovery.js, main.js, update-progress.html도 같은 규칙):
+  //  - 업스트림 UI와 같은 말투: 진행 상태는 "<대상> 로딩 중..."(말줄임표는 ASCII 점 셋),
+  //    안내·설명은 "~합니다."/"~하세요.", 탭·항목 이름은 짧은 명사.
+  //  - 래퍼 고유 기능에도 원본에 있던 것처럼 보이는 단어만 쓴다. 내부 용어(구성 요소, 서비스 워커 등)는 노출하지 않는다.
   const lang = (document.documentElement.lang || "ko").toLowerCase().startsWith("en") ? "en" : "ko";
   const T = {
     ko: {
-      loading: "RHWP 로드 중...",
+      loading: "RHWP 로딩 중...",
       about: "RHWP Online 정보",
       author: "제작자",
       repo: "저장소",
       license: "라이선스",
       licenseText: "이 프로그램은 MIT License로 배포됩니다.",
       upstreamNote: "웹 앱을 Electron으로 감싼 데스크톱 클라이언트입니다. 원본 웹 앱과 로고의 저작권은 Edward Kim에게 있으며, 원본 또한 MIT License로 제공됩니다.",
-      tab: "외관 및 UI",
+      tab: "외관",
       theme: "테마",
       themeDesc: "앱 전체의 밝기 테마입니다. 선택 즉시 적용되며 창 컨트롤 색도 함께 바뀝니다.",
       skin: "스킨",
@@ -92,6 +96,13 @@
   let ready = false;
   let lastFilename = "";
   const HWP_EXT = /\.(?:hwp|hwpx|hwt|hml|hwpml)$/i;
+  // 셸 상태 문구 — 걸려 있는 동안은 로딩·파일명 대신 이 문구를 보여준다(wasm-recovery.js가 "RHWP 캐시 업데이트 중..."을
+  // 건다). 이 스크립트보다 먼저 호출됐으면 __rhwpShellStatusPending에 남겨 둔 값을 받는다. 재로딩되면 함께 사라진다.
+  let shellStatus = window.__rhwpShellStatusPending || "";
+  window.__rhwpShellStatus = (text) => {
+    shellStatus = text || "";
+    update();
+  };
   // 업스트림 제목: 문서 있음 → "파일명 - rhwp-studio", 없음 → "rhwp-studio",
   // PDF 인쇄 중엔 확장자 없는 basename을 잠시 노출(설치형 표시 모드면 접미사 없는 파일명도 가능)
   const filenameFromTitle = (title) => {
@@ -103,6 +114,13 @@
   };
   const update = () => {
     if (!titleEl) return;
+    if (shellStatus) {
+      if (titleEl.textContent !== shellStatus) {
+        titleEl.textContent = shellStatus;
+        reposition();
+      }
+      return;
+    }
     if (!ready) {
       titleEl.textContent = T.loading;
       reposition();
