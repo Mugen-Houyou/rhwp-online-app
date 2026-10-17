@@ -1,10 +1,12 @@
-const { app, BrowserWindow, dialog, shell, Menu, session, ipcMain, nativeTheme } = require("electron");
+const { app, BrowserWindow, dialog, Menu, session, ipcMain, nativeTheme } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const fs = require("fs");
 
 const APP_ICON_URI = require("./icon.js");
 const APP_VERSION = require("./package.json").version;
+// 창 정책(팝업·네비게이션 가드, 오버레이 색) — 스모크 테스트가 같은 모듈을 require해 실물을 시험한다
+const { RHWP_URL, overlayFor, attachShellPolicy } = require("./src/main/shell-policy.js");
 
 // 렌더러에 주입할 코드/마크업 — 모듈 로드 시 한 번 읽어 캐시 (다중 창마다 재읽기 불필요)
 const TITLEBAR_JS  = fs.readFileSync(path.join(__dirname, "src/renderer-inject/titlebar.js"), "utf8");
@@ -22,9 +24,6 @@ if (!gotLock) {
     win.focus();
   });
 }
-
-const RHWP_URL = "https://edwardkim.github.io/rhwp/";
-const RHWP_ORIGIN = "https://edwardkim.github.io";
 
 // --dev-show-topbar: electron . --dev-show-topbar 또는 앱.exe --dev-show-topbar
 const showTopbar = process.argv.includes("--dev-show-topbar");
@@ -58,16 +57,9 @@ function setupPermissions() {
   });
 }
 
-// 테마별 네이티브 타이틀바 오버레이 색 (업스트림 --ui-bg-light / --ui-text 대응)
-const OVERLAY_THEME = {
-  light: { color: "#f5f5f5", symbolColor: "#333333" }, // 라이트: 메뉴바 bg / 텍스트
-  dark:  { color: "#2b3037", symbolColor: "#eef1f5" }, // 다크:  메뉴바 bg / 텍스트
-};
-// data-theme-effective("light"|"dark") → setTitleBarOverlay 인자 (height 유지)
-const overlayFor = (eff) => ({
-  ...(OVERLAY_THEME[eff] || OVERLAY_THEME.light),
-  height: 27, // 메뉴바 높이(28px) - border(1px)
-});
+// createWindow가 만든 메인 창. 오버레이가 없는 자식 창(인쇄 미리보기 등)의 테마 보고를 걸러내기 위한 집합
+// (Electron 41 실측으로 자식 창은 preload를 상속하지 않지만, 방어적으로 둔다)
+const shellWindows = new WeakSet();
 
 function createWindow() {
   const winOptions = {
@@ -86,11 +78,12 @@ function createWindow() {
   // 타이틀바 통합: Windows 타이틀바 숨기고 메뉴바 우측에 창 컨트롤 오버레이
   if (!showTopbar) {
     winOptions.titleBarStyle = "hidden";
-    // 초기값은 OS 다크 여부로 추정(앱 기본 모드가 system) → preload가 로드 후 정밀 보정
-    winOptions.titleBarOverlay = overlayFor(nativeTheme.shouldUseDarkColors ? "dark" : "light");
+    // 초기값은 OS 다크 여부로 추정(앱 기본 모드가 system) → preload가 메뉴바 실측 색으로 보정
+    winOptions.titleBarOverlay = overlayFor({ effective: nativeTheme.shouldUseDarkColors ? "dark" : "light" });
   }
 
   const win = new BrowserWindow(winOptions);
+  shellWindows.add(win);
 
   // WASM 초기화 완료 감지 + 1초 안정화 지연 → 타이틀 바를 로딩 상태에서
   // 정상 상태로 전환. 모든 신호가 모인 뒤 추가로 READY_HOLD_MS만큼
@@ -155,36 +148,20 @@ function createWindow() {
     Menu.setApplicationMenu(null);
   }
 
-  // 같은 출처 팝업은 앱 내 새 창으로, 외부 링크는 기본 브라우저로
-  win.webContents.setWindowOpenHandler(({ url, frameName }) => {
-    // 셸의 "새 창" 요청 (titlebar.js의 "새로 만들기" 가로채기) — 풀스택 새 창 생성
-    if (frameName === "rhwp-shell-new-window") {
-      setImmediate(() => {
-        const newWin = createWindow();
-        if (newWin.isMinimized()) newWin.restore();
-        newWin.focus();
-      });
-      return { action: "deny" };
-    }
-    if (url.startsWith(RHWP_URL) || url.startsWith("about:blank")) {
-      return { action: "allow" };
-    }
-    shell.openExternal(url);
-    return { action: "deny" };
-  });
+  // 팝업·네비게이션 정책: 같은 출처 팝업(인쇄 미리보기)만 앱 안에, 외부 링크는 기본 브라우저로.
+  // 문서 하이퍼링크의 about:blank 팝업 처리 포함 — src/main/shell-policy.js 참조
+  attachShellPolicy(win);
 
-  // 앱 내 네비게이션도 RHWP 출처로만 제한 — 외부 URL은 기본 브라우저로
-  win.webContents.on("will-navigate", (event, url) => {
-    if (!url.startsWith(RHWP_ORIGIN)) {
-      event.preventDefault();
-      shell.openExternal(url);
-    }
-  });
-
-  // 창 제목: "rhwp-studio" → "RHWP", 파일 열면 "파일명 - RHWP"
+  // 창 제목: 업스트림 document-title.ts가 "파일명 - rhwp-studio" | "rhwp-studio" |
+  // (PDF 인쇄 중 잠깐) 확장자 없는 basename을 쓴다 → 브랜드만 RHWP로 바꾼다
   win.on("page-title-updated", (event, title) => {
     event.preventDefault();
-    win.setTitle(title.replace("rhwp-studio", "RHWP"));
+    const t = (title || "").trim();
+    win.setTitle(
+      !t || t === "rhwp-studio" ? "RHWP"
+        : / - rhwp-studio$/.test(t) ? t.replace(/ - rhwp-studio$/, " - RHWP")
+        : `${t} - RHWP`
+    );
   });
 
   // beforeunload가 창 닫기를 막을 때 확인 대화상자 표시
@@ -200,11 +177,6 @@ function createWindow() {
     if (choice === 0) event.preventDefault();
   });
 
-  // 파일 다운로드(내보내기/저장) — 저장 대화상자 표시
-  session.defaultSession.on("will-download", (event, item) => {
-    // Electron 기본 동작: 저장 대화상자 표시 후 다운로드
-  });
-
   // 파일 시스템 접근 제한 해제
   win.webContents.on("file-system-access-restricted", (event, details, callback) => {
     callback("allow");
@@ -216,7 +188,7 @@ function createWindow() {
       win.webContents.insertCSS(TITLEBAR_CSS);
     }
 
-    // 타이틀바·파일명 반영·About 메뉴 주입 — 자세한 동작은
+    // 타이틀바·About 메뉴 항목·외관 탭 주입 — 자세한 동작은
     // src/renderer-inject/titlebar.js 참조
     const cfg = JSON.stringify({ injectTitleBar: !showTopbar, version: APP_VERSION });
     win.webContents
@@ -237,13 +209,12 @@ let updateDownloaded = false;
 app.whenReady().then(() => {
   setupPermissions();
 
-  // 렌더러(preload)가 보고한 웹앱 테마로 네이티브 타이틀바 오버레이 색 갱신
-  ipcMain.on("rhwp-theme", (event, eff) => {
+  // 렌더러(preload)가 실측한 메뉴바 색 { effective, color, symbolColor }로 네이티브 타이틀바 오버레이 갱신
+  ipcMain.on("rhwp-theme", (event, payload) => {
     if (showTopbar) return; // 네이티브 메뉴 모드는 오버레이 없음
     const win = BrowserWindow.fromWebContents(event.sender);
-    if (win) {
-      try { win.setTitleBarOverlay(overlayFor(eff)); } catch {}
-    }
+    if (!win || !shellWindows.has(win)) return; // 메인 창이 아닌 창의 보고는 무시
+    try { win.setTitleBarOverlay(overlayFor(payload)); } catch {}
   });
 
   createWindow();

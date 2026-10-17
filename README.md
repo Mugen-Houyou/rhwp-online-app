@@ -21,7 +21,12 @@ npm run build:portable  # portable 단독
 
 ## 구성
 
-단일 파일 Electron 앱입니다. 엔트리는 [main.js](main.js)이며, 앱 설정과 빌드 구성은 [package.json](package.json)에 있습니다.
+엔트리는 [main.js](main.js)(창 생성·권한·자동 업데이트)이고, 앱 설정과 빌드 구성은 [package.json](package.json)에 있습니다. 나머지는 `src/` 아래에 있습니다.
+
+- `src/main/shell-policy.js` — 팝업·네비게이션 가드와 타이틀바 오버레이 색 (메인 프로세스)
+- `src/preload/theme-bridge.js` — 웹앱 메뉴바 색을 실측해 메인에 전달하는 preload
+- `src/renderer-inject/titlebar.js`, `titlebar.css` — 페이지 로드 후 주입: 타이틀 표시, "RHWP Online 정보" 메뉴, 환경 설정의 "외관 및 UI" 탭
+- `src/dialogs/update-progress.html` — 종료 시 업데이트 설치 진행 창
 
 ## 크레딧
 

@@ -8,6 +8,10 @@
 #menu-bar .menu-item {
   -webkit-app-region: no-drag;
 }
+/* 메뉴바 우측 명령 버튼(#toolbox-basic-toggle 등)도 클릭 가능해야 하므로 드래그 제외 */
+#menu-bar .menu-command {
+  -webkit-app-region: no-drag;
+}
 /* VS Code 스타일 중앙 타이틀 표시 — left/right는 JS가
    메뉴 항목 실측 폭에 따라 동적으로 설정 */
 #rhwp-title-bar {
