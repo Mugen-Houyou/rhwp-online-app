@@ -1,8 +1,13 @@
 <!DOCTYPE html>
 <html>
 <body style="margin:0;background:#fff;font-family:'Malgun Gothic',sans-serif;user-select:none;display:flex;align-items:center;justify-content:center;height:100vh">
-  <div style="display:flex;align-items:center;gap:20px">
-    <img src="__APP_ICON_URI__" width="40" height="40" style="flex-shrink:0;border-radius:8px" />
+  <div style="display:flex;align-items:center;gap:40px">
+    <!-- 로고 PNG(256×256)는 그림이 가운데 162×228뿐이고 사방이 투명 여백(좌 49·우 45·상 13·하 15px)이라,
+         상자째 정렬하면 그림이 어중간하게 치우쳐 보인다. object-view-box로 여백을 잘라 상자 = 그림으로 만들고
+         (값은 PNG 픽셀 단위 — 화면 배율·문구 폭과 무관), 정렬은 바깥 flex의 가운데 정렬에 맡긴다.
+         투명 여백을 조금이라도 남기면 그만큼 보이지 않는 폭이 정렬에 섞여 다시 치우치므로 바짝 자른다
+         (경계는 alpha≥1 기준이라 그림은 깎이지 않는다). 높이는 예전 40px 상자 안에서 보이던 그림 크기(40 × 228/256). -->
+    <img src="__APP_ICON_URI__" alt="" style="flex-shrink:0;height:calc(40px * 228 / 256);width:auto;object-view-box:inset(13px 45px 15px 49px)" />
     <div>
       <p style="margin:0 0 8px;font-size:14px;color:#333;font-weight:600">
         RHWP Online 업데이트 중...</p>
