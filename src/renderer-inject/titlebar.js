@@ -1,9 +1,10 @@
 // 렌더러 주입용 — main.js가 fs.readFileSync로 읽어 executeJavaScript로 호출한다.
 // 단독 테스트: DevTools에 파일 내용을 그대로 붙여넣고
-//   f({ injectTitleBar: true, version: "1.0.23" })
+//   f({ injectTitleBar: true, version: "1.0.23", platform: "win32" })
 // 처럼 호출하면 동일하게 동작한다.
 (cfg) => {
-  const { injectTitleBar, version } = cfg;
+  const { injectTitleBar, version, platform } = cfg;
+  const isMac = platform === "darwin";
 
   // 표시 문자열 — 업스트림이 <html lang>을 유효 로케일(ko|en)로 맞춘다(locale-init.js / i18n/dom.ts).
   // 현재 업스트림엔 언어 선택 UI가 없어 기본은 ko. 테마·스킨 라벨은 업스트림 레지스트리 라벨을 우선 쓰고
@@ -24,7 +25,9 @@
       upstreamNote: "웹 앱을 Electron으로 감싼 데스크톱 클라이언트입니다. 원본 웹 앱과 로고의 저작권은 Edward Kim에게 있으며, 원본 또한 MIT License로 제공됩니다.",
       tab: "외관",
       theme: "테마",
-      themeDesc: "앱 전체의 밝기 테마입니다. 선택 즉시 적용되며 창 컨트롤 색도 함께 바뀝니다.",
+      // macOS의 창 컨트롤(트래픽 라이트)은 색이 고정이라 그 부분을 뺀다
+      themeDesc: isMac ? "앱 전체의 밝기 테마입니다. 선택 즉시 적용됩니다."
+        : "앱 전체의 밝기 테마입니다. 선택 즉시 적용되며 창 컨트롤 색도 함께 바뀝니다.",
       skin: "스킨",
       skinDesc: "메뉴·도구 상자 등 UI의 모양새입니다. 선택 즉시 적용됩니다.",
       modes: { system: "시스템 설정", light: "밝게", dark: "어둡게" },
@@ -40,7 +43,8 @@
       upstreamNote: "is the web app this desktop client wraps with Electron. The original web app and logo are copyright Edward Kim and are also provided under the MIT License.",
       tab: "Appearance",
       theme: "Theme",
-      themeDesc: "Color theme for the whole app. Applied immediately; the window controls follow.",
+      themeDesc: isMac ? "Color theme for the whole app. Applied immediately."
+        : "Color theme for the whole app. Applied immediately; the window controls follow.",
       skin: "Skin",
       skinDesc: "Look of the menus and toolbars. Applied immediately.",
       modes: { system: "System", light: "Light", dark: "Dark" },
@@ -62,8 +66,9 @@
 
   // 메뉴 항목의 실제 우측 끝을 측정해 타이틀 바를 그 다음에 배치. 우측 한계는 메뉴바 우측 명령 버튼
   // (#toolbox-basic-toggle 등 .menu-command) 중 가장 왼쪽 가장자리, 없으면 창 컨트롤 예약 폭.
-  // 가용 폭이 부족하면 숨김
-  const CONTROLS_RESERVED = 160; // 창 컨트롤(140) + 여백(20)
+  // 가용 폭이 부족하면 숨김. macOS는 창 컨트롤(트래픽 라이트)이 왼쪽에 있어 오른쪽 예약이 없다 — 왼쪽은
+  // titlebar-mac.css의 padding-left가 메뉴 항목을 밀어내므로 항목 실측값에 이미 들어 있다
+  const CONTROLS_RESERVED = isMac ? 0 : 160; // Windows: 창 컨트롤(140) + 여백(20)
   const MIN_GAP = 20;
   const MIN_WIDTH = 80;
   const reposition = () => {
@@ -254,6 +259,9 @@
     closeBtn.focus(); // 포커스를 다이얼로그로 — 타이핑이 편집기로 새지 않게
     // 링크(<a target="_blank">)는 main.js의 창 정책이 외부 URL로 판정해 기본 브라우저로 보낸다
   };
+
+  // macOS 앱 메뉴의 "RHWP Online 정보"가 main.js를 거쳐 호출한다(파일 메뉴 항목과 같은 다이얼로그)
+  window.__rhwpOpenAbout = openAboutDialog;
 
   whenAutomationReady((api) => {
     api.registerCommand({

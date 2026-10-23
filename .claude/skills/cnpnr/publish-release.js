@@ -1,7 +1,9 @@
 // 초안 릴리스 게시 — electron-builder가 CI에서 만든 draft를 제목·본문과 함께 공개로 전환한다.
 // usage: ELECTRON_RUN_AS_NODE=1 node_modules/electron/dist/electron.exe publish-release.js <owner/repo> <tag> <notes.md> [--username NAME]
-// 자격증명: Git Credential Manager에 저장된 GitHub 항목을 git credential fill로 읽는다(토큰은 절대 출력하지 않는다).
-//   우선순위: --username → git config credential.https://github.com.username → GCM에 저장된 계정 목록 순.
+//        (macOS: electron.exe 대신 node_modules/electron/dist/Electron.app/Contents/MacOS/Electron)
+// 자격증명: 저장된 GitHub 항목을 git credential fill로 읽는다(토큰은 절대 출력하지 않는다).
+//   우선순위: GH_TOKEN/GITHUB_TOKEN 환경 변수 → --username → git config credential.https://github.com.username →
+//   Git Credential Manager(Windows)에 저장된 계정 목록 → 사용자명 없이 자격증명 도우미(macOS osxkeychain 등)가 주는 항목.
 //   초안이 보이는(푸시 권한 있는) 첫 항목을 쓴다.
 // exit: 0 = 게시됨, 3 = 이미 게시돼 있음, 2 = 쓸 수 있는 자격증명 없음, 1 = 실패
 const { execSync } = require("child_process");
@@ -34,7 +36,8 @@ function candidateUsers() {
   return [...new Set(list)];
 }
 function tokenFor(user) {
-  const out = sh("git credential fill", `protocol=https\nhost=github.com\nusername=${user}\n\n`);
+  // user가 없으면 도우미가 저장된 사용자명을 함께 돌려준다(osxkeychain)
+  const out = sh("git credential fill", `protocol=https\nhost=github.com\n${user ? `username=${user}\n` : ""}\n`);
   const m = /^password=(.*)$/m.exec(out);
   return m ? m[1].trim() : null;
 }
@@ -51,8 +54,12 @@ async function gh(token, path, init = {}) {
 
 (async () => {
   let chosen = null;
-  for (const user of candidateUsers()) {
-    const token = tokenFor(user);
+  const candidates = [];
+  const envToken = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
+  if (envToken) candidates.push({ user: "env:GH_TOKEN", token: envToken });
+  for (const user of candidateUsers()) candidates.push({ user, token: tokenFor(user) });
+  if (!candidates.length) candidates.push({ user: "credential-helper", token: tokenFor(null) });
+  for (const { user, token } of candidates) {
     if (!token) { console.log(`[${user}] no stored token`); continue; }
     const rel = await gh(token, `/repos/${REPO}/releases?per_page=10`);
     const found = Array.isArray(rel.body) ? rel.body.find((x) => x.tag_name === TAG) : null;

@@ -1,0 +1,4 @@
+/* Windows: 창 컨트롤 오버레이(최소화/최대화/닫기)가 메뉴바 오른쪽 위에 그려지므로 그만큼 비운다 */
+#menu-bar {
+  padding-right: 140px !important;
+}

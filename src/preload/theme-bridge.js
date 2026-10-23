@@ -1,11 +1,14 @@
 // 렌더러(격리 월드) preload — 메뉴바의 실제 배경/글자색을 읽어 메인에 전달한다.
 // 메인은 이 값으로 네이티브 타이틀바 오버레이(최소화/최대화/닫기) 색을 맞춘다.
+// macOS는 트래픽 라이트 색을 바꿀 수 없어, 함께 보내는 테마 모드(system|light|dark)로 네이티브 UI(메뉴·시트)의
+// 밝기만 앱에 맞춘다(main.js → nativeTheme.themeSource).
 // 업스트림은 <html data-theme-effective="light|dark">로 유효 테마를, <html data-theme-skin="flat|oldschool">
 // (기본 스킨은 속성 없음)로 스킨을 표시하며, 스킨마다 #menu-bar 배경이 다르다. 그래서 고정 색표 대신
 // getComputedStyle 실측값을 보내고, 메인은 실측값이 없을 때만 라이트/다크 기본표로 보완한다.
 // contextIsolation=true라도 preload는 ipcRenderer와 DOM에 접근 가능하다.
 const { ipcRenderer } = require("electron");
 
+const THEME_MODES = new Set(["system", "light", "dark"]);
 const hex2 = (n) => n.toString(16).padStart(2, "0");
 // Chromium의 계산된 색은 "rgb(r, g, b)" / "rgba(r, g, b, a)"로 직렬화된다. 불투명한 색만 #rrggbb로.
 function cssColorToHex(css) {
@@ -18,6 +21,8 @@ function cssColorToHex(css) {
 function readOverlay() {
   const root = document.documentElement;
   const effective = root.getAttribute("data-theme-effective") === "dark" ? "dark" : "light";
+  const modeAttr = root.getAttribute("data-theme-mode"); // theme-init.js / theme.ts가 system|light|dark로 유지
+  const mode = THEME_MODES.has(modeAttr) ? modeAttr : "system";
   const bar = document.getElementById("menu-bar"); // preload 실행 시점(DOM 파싱 전)엔 없을 수 있다
   let color = null;
   let symbolColor = null;
@@ -27,13 +32,13 @@ function readOverlay() {
     const title = bar.querySelector(".menu-title"); // 메뉴 글자색 = 캡션 버튼 기호색
     symbolColor = cssColorToHex((title ? getComputedStyle(title) : barStyle).color);
   }
-  return { effective, color, symbolColor };
+  return { effective, mode, color, symbolColor };
 }
 
 let lastKey = null;
 function send() {
   const p = readOverlay();
-  const key = `${p.effective}|${p.color}|${p.symbolColor}`;
+  const key = `${p.effective}|${p.mode}|${p.color}|${p.symbolColor}`;
   if (key === lastKey) return; // 중복 전송 방지
   lastKey = key;
   ipcRenderer.send("rhwp-theme", p);

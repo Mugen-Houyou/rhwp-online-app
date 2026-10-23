@@ -12,9 +12,12 @@ argument-hint: "[X.Y.Z | patch(기본) | minor | major] [--draft] [--notes-only]
 - `--notes-only`: git 동작 없이, 현재 변경(작업 트리 + 직전 태그 이후 커밋)으로 릴리스 노트만 작성해 제시.
 
 ## 이 저장소의 전제 (바뀌면 여기부터 고친다)
-- Node/npm/gh가 없는 PC가 있다 — JS 실행은 항상 `ELECTRON_RUN_AS_NODE=1 node_modules/electron/dist/electron.exe <script.js>`
-  (`npm install`로 받은 Electron이 Node 런타임을 겸한다). 릴리스 산출물은 **CI만** 만든다(`.github/workflows/release.yml`,
-  `v*` 태그 푸시 → windows-latest) — 로컬 `electron-builder` 빌드는 하지 않는다.
+- Node/npm/gh가 없는 PC가 있다 — JS 실행은 `npm install`로 받은 Electron을 Node 런타임으로 쓴다:
+  Windows `ELECTRON_RUN_AS_NODE=1 node_modules/electron/dist/electron.exe <script.js>`,
+  macOS `ELECTRON_RUN_AS_NODE=1 node_modules/electron/dist/Electron.app/Contents/MacOS/Electron <script.js>`
+  (아래 명령의 `electron.exe` 자리에 플랫폼에 맞는 경로를 넣는다). 릴리스 산출물은 **CI만** 만든다
+  (`.github/workflows/release.yml`, `v*` 태그 푸시 → windows-latest 잡, 이어서 macos-latest 잡) — 로컬
+  `electron-builder` 빌드는 릴리스에 쓰지 않는다(이 Mac에 설치해 쓰는 용도는 `/sync-app`).
 - 브랜치는 `main`, 원격 이름은 `git config branch.main.remote`로 확인한다(클론마다 다르다: `origin`, `mainremote` 등).
   태그는 **lightweight** `vX.Y.Z`.
 - 커밋 작성자는 PC의 git 설정과 무관하게 저장소 이력의 작성자로 고정:
@@ -24,7 +27,11 @@ argument-hint: "[X.Y.Z | patch(기본) | minor | major] [--draft] [--notes-only]
 - CI는 electron-builder 기본값대로 **초안(draft)** 릴리스를 만든다. 게시는 `publish-release.js`가 Git Credential Manager에
   저장된 GitHub 자격증명으로 한다 — 초안이 보이는(푸시 권한 있는) 항목을 골라 쓰고, 토큰은 절대 출력하지 않는다.
 - GitHub 무인증 API는 60회/시간이라 CI 감시는 Actions HTML 페이지의 상태 JSON으로 한다(`watch-ci.sh`).
-- 산출물 이름: `RHWP-Setup-X.Y.Z.exe`(+`.blockmap`), `RHWP-Portable-X.Y.Z.exe`, `latest.yml`. 릴리스 제목은 직전 릴리스 형식을 따른다(현재 `1.0.24` 식).
+- 산출물 이름: Windows `RHWP-Setup-X.Y.Z.exe`(+`.blockmap`), `RHWP-Portable-X.Y.Z.exe`, `latest.yml`;
+  macOS(Apple Silicon) `RHWP-X.Y.Z-arm64.dmg`, `RHWP-X.Y.Z-arm64.zip`(+`.blockmap`), `latest-mac.yml`.
+  릴리스 제목은 직전 릴리스 형식을 따른다(현재 `1.0.24` 식).
+- macOS 빌드는 서명 secrets(`CSC_LINK` 등)가 없으면 ad-hoc 서명이다 — 처음 열 때 "그래도 열기"가 필요하고,
+  앱은 자동 설치 대신 새 버전 안내만 띄운다. 그 안내 문구가 릴리스 노트 다운로드 블록에 고정으로 들어 있다.
 
 ## 절차
 
@@ -60,7 +67,7 @@ R=$(git config branch.main.remote) && git tag vX.Y.Z && git push "$R" main && gi
 - 푸시가 **403 `Permission ... denied`** 이면 GCM 계정 선택 창에서 푸시 권한 없는 항목을 고른 것 — 다시 푸시하며 올바른 계정을
   고르게 하고, 반복되면 `git config credential.https://github.com.username <계정>`으로 이 저장소의 계정을 고정한다.
 
-### 4. CI 감시 (백그라운드, 보통 5–8분)
+### 4. CI 감시 (백그라운드, Windows 잡 → macOS 잡 순서, 보통 12–18분)
 ```bash
 bash .claude/skills/cnpnr/watch-ci.sh Mugen-Houyou/rhwp-online-app vX.Y.Z 30
 ```
@@ -77,7 +84,7 @@ ELECTRON_RUN_AS_NODE=1 node_modules/electron/dist/electron.exe .claude/skills/cn
 ```bash
 bash .claude/skills/cnpnr/verify-release.sh Mugen-Houyou/rhwp-online-app vX.Y.Z
 ```
-`latest.yml`의 version이 X.Y.Z이고 Assets 4종이 있으며 `releases/latest`가 새 태그를 가리켜야 한다. `--draft`면 초안이라 404가 정상 — 건너뛴다.
+`latest.yml`·`latest-mac.yml`의 version이 X.Y.Z이고 Assets 8종(Windows 4 + macOS 4)이 있으며 `releases/latest`가 새 태그를 가리켜야 한다. `--draft`면 초안이라 404가 정상 — 건너뛴다.
 
 ### 8. 마무리 보고
 커밋 해시·태그·CI run URL·릴리스 URL·검증 결과를 짧게 적고, **마지막에 릴리스 노트 본문을 코드 블록으로** 붙인다(게시했더라도 — 사용자가 GitHub에서 다듬을 수 있게).
@@ -85,11 +92,11 @@ bash .claude/skills/cnpnr/verify-release.sh Mugen-Houyou/rhwp-online-app vX.Y.Z
 ## 릴리스 노트 형식 (저장소 관례 — 그대로 지킨다)
 - 한국어, 사용자 관점. 내부 용어(서비스 워커, DOM, IPC 등) 금지. 사용자가 화면에서 보는 문구(오류 메시지·탭 이름 등)는 큰따옴표로 인용한다.
 - 섹션 순서: 변경 묶음들 → `## 상세 변경 내역` → `## 다운로드`.
-- 변경 묶음마다 `## <묶음 이름>` 하나. 지금까지 쓴 이름: `원본 RHWP x.y.z 반영`, `동작 변경`, `안정성`, `일부 UI 수정`. 필요하면 같은 결로 새로 짓는다.
+- 변경 묶음마다 `## <묶음 이름>` 하나. 지금까지 쓴 이름: `원본 RHWP x.y.z 반영`, `동작 변경`, `안정성`, `일부 UI 수정`, `macOS 지원`. 필요하면 같은 결로 새로 짓는다.
 - 항목은 두 칸 들여쓴 `  - `로, 한 항목 = 한 변경. **명사형으로 짧게** 끝내고 마침표를 찍지 않는다("~ 수정", "~ 통일", "~ 축약").
   동작 설명·이유·"(이전에는 …)" 같은 부연은 붙이지 않는다 — 자세한 내용은 상세 변경 내역 링크가 맡는다.
 - 굵게(`**`)는 다운로드 섹션의 **"Assets" 섹션**과 권장 파일 **RHWP-Setup-X.Y.Z.exe** 두 곳에만. 항목 본문과 포터블 파일명은 굵게 하지 않는다.
-- 상세 변경 내역·다운로드 블록은 고정 문구. 비교 링크는 직전 태그 → 새 태그.
+- 상세 변경 내역·다운로드 블록은 고정 문구(macOS 첫 실행 안내 한 줄 포함). 비교 링크는 직전 태그 → 새 태그.
 
 ```markdown
 ## 안정성
@@ -109,6 +116,9 @@ https://github.com/Mugen-Houyou/rhwp-online-app/compare/v<직전>...vX.Y.Z
 
 아래 **"Assets" 섹션**에서 받아주세요.
 
- - 포터블: RHWP-Portable-X.Y.Z.exe
- - 설치형 (권장): **RHWP-Setup-X.Y.Z.exe**
+ - Windows 포터블: RHWP-Portable-X.Y.Z.exe
+ - Windows 설치형 (권장): **RHWP-Setup-X.Y.Z.exe**
+ - macOS (Apple Silicon): RHWP-X.Y.Z-arm64.dmg
+
+macOS에서 처음 열 때 "확인할 수 없는 개발자" 안내가 뜨면 시스템 설정 → 개인정보 보호 및 보안에서 "그래도 열기"를 눌러주세요.
 ```

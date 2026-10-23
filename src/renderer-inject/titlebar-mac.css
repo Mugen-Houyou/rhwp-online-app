@@ -1,0 +1,8 @@
+/* macOS: 트래픽 라이트(닫기/최소화/확대)가 메뉴바 왼쪽 위에 그려진다. 그 영역의 폭은 Chromium이
+   env(titlebar-area-x)로 알려준다(main.js의 trafficLightPosition x:12 기준 84px). 전체 화면에서는
+   트래픽 라이트가 숨고 env()가 정의되지 않으므로 폴백 8px(업스트림 기본 여백)로 돌아간다.
+   오른쪽에는 컨트롤이 없으니 업스트림 기본 여백을 유지한다 */
+#menu-bar {
+  padding-left: env(titlebar-area-x, 8px) !important;
+  padding-right: 8px !important;
+}

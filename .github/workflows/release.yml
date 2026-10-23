@@ -29,3 +29,42 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx electron-builder --win --publish always
+
+  # macOS(Apple Silicon) 빌드. Windows 잡이 만든 초안 릴리스(태그 기준)에 자산을 덧붙이므로 그 뒤에 돈다 —
+  # 동시에 돌면 둘 다 초안을 새로 만들어 릴리스가 둘로 갈라질 수 있다.
+  # 서명: 저장소 secrets에 Developer ID 인증서(CSC_LINK, CSC_KEY_PASSWORD)와 공증 자격증명(APPLE_ID,
+  # APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID)이 있으면 서명·공증하고 앱에 macSigned=true를 심어
+  # 자동 설치 업데이트를 켠다. 없으면 ad-hoc 서명으로 빌드한다(첫 실행 때 "그래도 열기" 필요, 업데이트는 안내만).
+  release-mac:
+    needs: release
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and publish (macOS arm64)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$CSC_LINK" ]; then
+            echo "Developer ID certificate found: signing, notarizing, macSigned=true"
+            npx electron-builder --mac --arm64 --publish always -c.extraMetadata.macSigned=true
+          else
+            echo "No signing certificate: ad-hoc build"
+            CSC_IDENTITY_AUTO_DISCOVERY=false npx electron-builder --mac --arm64 --publish always
+          fi

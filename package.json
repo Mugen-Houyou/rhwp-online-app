@@ -1,12 +1,14 @@
 {
   "name": "rhwp-online-app",
-  "version": "1.0.25",
+  "version": "1.1.0",
   "description": "RHWP - Desktop App",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --win",
-    "build:portable": "electron-builder --win portable"
+    "build:portable": "electron-builder --win portable",
+    "build:mac": "electron-builder --mac --arm64",
+    "build:mac:dir": "electron-builder --mac --arm64 --dir"
   },
   "author": "Mugen-Houyou",
   "license": "MIT",
@@ -17,6 +19,13 @@
   "build": {
     "appId": "com.rhwp.online-app",
     "productName": "RHWP",
+    "files": [
+      "main.js",
+      "icon.js",
+      "src/**",
+      "build/icon.png",
+      "build/icon-mac.png"
+    ],
     "win": {
       "target": [
         "nsis",
@@ -33,6 +42,25 @@
         "ko-KR",
         "en-US"
       ]
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.productivity",
+      "icon": "build/icon-mac.png",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "publish": {
       "provider": "github",
