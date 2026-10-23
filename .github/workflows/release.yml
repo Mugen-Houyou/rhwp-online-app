@@ -65,6 +65,9 @@ jobs:
             echo "Developer ID certificate found: signing, notarizing, macSigned=true"
             npx electron-builder --mac --arm64 --publish always -c.extraMetadata.macSigned=true
           else
+            # secrets가 없으면 위 env들이 빈 문자열로 정의된다. electron-builder는 CSC_LINK가 비어 있어도
+            # 정의만 돼 있으면 인증서 파일로 읽으려다 "not a file"로 죽으므로, 지우고 ad-hoc으로 보낸다
             echo "No signing certificate: ad-hoc build"
+            unset CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
             CSC_IDENTITY_AUTO_DISCOVERY=false npx electron-builder --mac --arm64 --publish always
           fi
